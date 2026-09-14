@@ -1,0 +1,25 @@
+# Credentials and secrets: never committed
+.env
+config/client_secret*.json
+config/token.json
+config/gmail-allowlist.json
+
+# Owner-specific: triage rules appended to rules.md at run time, and local-only scripts
+rules.local.md
+local/
+
+# Runtime data (contains personal email content): never committed
+data/events/*.jsonl
+data/runtime/*
+!data/events/.gitkeep
+!data/runtime/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.venv/
+*.egg-info/
+
+.DS_Store

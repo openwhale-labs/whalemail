@@ -1,0 +1,7 @@
+{
+  "_comment": "Fetch scope. Copy to gmail-allowlist.json and fill in (the real file is git-ignored). fetch_query: which mail to fetch; the default is everything received, including mail a filter archived past the inbox. exclude_labels: label ids to skip entirely, without classifying.",
+  "account": "you@gmail.com",
+  "fetch_query": "-in:spam -in:trash -in:chats -in:sent",
+  "exclude_labels": [],
+  "_exclude_labels_hint": "Use label ids (GET /gmail/v1/users/me/labels), not display names. Parent and child labels have separate ids; list each one."
+}

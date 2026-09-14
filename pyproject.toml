@@ -1,0 +1,27 @@
+[project]
+name = "whalemail"
+version = "0.1.0"
+description = "Gmail triage for one inbox: five buckets, a morning digest and real-time alerts on Telegram, and an agent that drafts replies but never sends."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.11"
+dependencies = [
+    "google-auth>=2.30",
+    "google-auth-oauthlib>=1.2",
+]
+
+[project.urls]
+Homepage = "https://github.com/openwhale-labs/whalemail"
+
+# The Gmail API is called with stdlib urllib (one proxy configuration for everything);
+# google-auth(-oauthlib) only manages the OAuth token. The LLM endpoint and Telegram are
+# also plain urllib, no SDKs.
+
+[tool.setuptools.packages.find]
+include = ["adapters*", "triage*", "digest*", "agent*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
