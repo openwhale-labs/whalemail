@@ -23,7 +23,7 @@ def _get(token: str, path: str, params: dict | None = None) -> dict:
         url += "?" + urllib.parse.urlencode(params, doseq=True)
     req = urllib.request.Request(url, method="GET")
     req.add_header("Authorization", f"Bearer {token}")
-    return net.urlopen_json(req, timeout=30)
+    return net.urlopen_json(req, timeout=30, retry_server_errors=True)
 
 
 def _post(token: str, path: str, body: dict) -> dict:

@@ -1,7 +1,8 @@
 """urllib with retries for the transient SSL/network errors an unattended job will meet.
 
-Only connection-level errors are retried. HTTPError (4xx/5xx, e.g. a wrong model name)
-is raised immediately so it is never masked.
+Connection-level errors are retried. Idempotent GET callers may also opt into
+bounded retries for 500/502/503/504; HTTP errors on writes and other callers
+are raised immediately.
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ def urlopen_json(
     timeout: int = 30,
     retries: int = 3,
     backoff: float = 1.5,
+    retry_server_errors: bool = False,
 ) -> dict:
     """Send the request and parse the JSON body; retry transient errors, re-raise the last one."""
     last: Exception | None = None
@@ -25,8 +27,18 @@ def urlopen_json(
         try:
             with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310
                 return json.loads(r.read().decode("utf-8"))
-        except urllib.error.HTTPError:
-            raise  # explicit server error: do not retry
+        except urllib.error.HTTPError as e:
+            if (
+                not retry_server_errors
+                or req.get_method() != "GET"
+                or e.code not in {500, 502, 503, 504}
+                or i == retries - 1
+            ):
+                raise
+            # Release failed responses before retrying. Keep the final error intact.
+            last = e
+            e.close()
+            time.sleep(backoff * (2**i))
         except (urllib.error.URLError, TimeoutError, OSError) as e:
             last = e
             if i < retries - 1:
