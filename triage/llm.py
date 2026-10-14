@@ -1,13 +1,16 @@
 """Chat completion through any OpenAI-compatible endpoint (stdlib urllib, honours proxy env vars).
 
 Base URL, key and model come from the environment. Requests go through net.urlopen_json,
-which retries transient network errors.
+which retries transient network errors. Rejected chat requests with HTTP 503
+are retried up to three attempts before any downstream action is executed.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import time
+import urllib.error
 import urllib.request
 
 import net
@@ -43,5 +46,21 @@ def chat(
     # Optional attribution headers used by OpenRouter's dashboard; harmless elsewhere.
     req.add_header("HTTP-Referer", "https://github.com/openwhale-labs/whalemail")
     req.add_header("X-Title", "whalemail")
-    d = net.urlopen_json(req, timeout=timeout)
-    return d["choices"][0]["message"]["content"]
+    for attempt in range(3):
+        try:
+            d = net.urlopen_json(req, timeout=timeout)
+            return d["choices"][0]["message"]["content"]
+        except urllib.error.HTTPError as exc:
+            # Retry only a rejected inference request. Never replay Gmail/Telegram writes.
+            if exc.code != 503 or attempt == 2:
+                raise
+            delay = 1.5 * (2**attempt)
+            retry_after = exc.headers.get("Retry-After") if exc.headers else None
+            if retry_after and retry_after.strip().isdigit():
+                delay = max(delay, int(retry_after.strip()))
+            if delay > 30:
+                # Respect a longer server cooldown by leaving this run failed.
+                raise
+            exc.close()
+            time.sleep(delay)
+    raise AssertionError("unreachable")
