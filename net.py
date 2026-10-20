@@ -1,12 +1,13 @@
 """urllib with retries for the transient SSL/network errors an unattended job will meet.
 
 Connection-level errors are retried. Idempotent GET callers may also opt into
-bounded retries for 500/502/503/504; HTTP errors on writes and other callers
-are raised immediately.
+bounded retries for 500/502/503/504 and truncated response bodies; these failures
+on writes and other callers are raised immediately.
 """
 
 from __future__ import annotations
 
+import http.client
 import json
 import time
 import urllib.error
@@ -38,6 +39,15 @@ def urlopen_json(
             # Release failed responses before retrying. Keep the final error intact.
             last = e
             e.close()
+            time.sleep(backoff * (2**i))
+        except http.client.IncompleteRead as e:
+            if (
+                not retry_server_errors
+                or req.get_method() != "GET"
+                or i == retries - 1
+            ):
+                raise
+            last = e
             time.sleep(backoff * (2**i))
         except (urllib.error.URLError, TimeoutError, OSError) as e:
             last = e

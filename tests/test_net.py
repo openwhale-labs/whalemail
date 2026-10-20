@@ -1,4 +1,5 @@
 import io
+import http.client
 import unittest
 import urllib.error
 import urllib.request
@@ -15,6 +16,52 @@ def error(code):
 
 
 class ServerRetryTests(unittest.TestCase):
+    @patch("net.time.sleep")
+    @patch("net.urllib.request.urlopen")
+    def test_opted_in_get_recovers_from_truncated_body(self, urlopen, sleep):
+        class TruncatedBody(io.BytesIO):
+            def read(self, *args):
+                raise http.client.IncompleteRead(b'{"ok":')
+
+        response = TruncatedBody()
+        urlopen.side_effect = [response, io.BytesIO(b'{"ok": true}')]
+        result = net.urlopen_json(
+            urllib.request.Request("https://example.invalid"),
+            retry_server_errors=True,
+        )
+        self.assertEqual(result, {"ok": True})
+        self.assertTrue(response.closed)
+        self.assertEqual(urlopen.call_count, 2)
+        sleep.assert_called_once_with(1.5)
+
+    def test_truncated_writes_and_opt_out_are_not_retried(self):
+        for method, enabled in [("POST", True), ("GET", False)]:
+            with self.subTest(method=method, enabled=enabled):
+                failure = http.client.IncompleteRead(b"partial")
+                with patch("net.urllib.request.urlopen", side_effect=failure) as opened:
+                    with patch("net.time.sleep") as sleep:
+                        with self.assertRaises(http.client.IncompleteRead):
+                            net.urlopen_json(
+                                urllib.request.Request("https://example.invalid", method=method),
+                                retry_server_errors=enabled,
+                            )
+                        self.assertEqual(opened.call_count, 1)
+                        sleep.assert_not_called()
+
+    @patch("net.time.sleep")
+    @patch("net.urllib.request.urlopen")
+    def test_truncated_read_retries_are_bounded(self, urlopen, sleep):
+        failures = [http.client.IncompleteRead(b"partial") for _ in range(3)]
+        urlopen.side_effect = failures
+        with self.assertRaises(http.client.IncompleteRead) as caught:
+            net.urlopen_json(
+                urllib.request.Request("https://example.invalid"),
+                retry_server_errors=True,
+            )
+        self.assertIs(caught.exception, failures[-1])
+        self.assertEqual(urlopen.call_count, 3)
+        self.assertEqual(sleep.call_args_list, [call(1.5), call(3.0)])
+
     @patch("net.time.sleep")
     @patch("net.urllib.request.urlopen")
     def test_opted_in_read_recovers_from_backend_error(self, urlopen, sleep):
