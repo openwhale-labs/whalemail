@@ -42,6 +42,24 @@ def test_extract_json_strips_fence():
     assert C._extract_json('prefix {"results": [{"i": 0}]} suffix') == {"results": [{"i": 0}]}
 
 
+def test_classification_request_constrains_response_to_json(monkeypatch):
+    monkeypatch.setenv("WHALEMAIL_LLM_API_KEY", "test-key")
+    requests = []
+
+    def fake_request(request, **kwargs):
+        requests.append(json.loads(request.data))
+        content = json.dumps(
+            {"results": [{"i": 0, "bucket": "action", "summary": "S", "action": "do"}]}
+        )
+        return {"choices": [{"message": {"content": content}}]}
+
+    monkeypatch.setattr(C.llm.net, "urlopen_json", fake_request)
+    out = C.classify([_Ev("e0", "S", "s")])
+    assert len(requests) == 1
+    assert requests[0].get("response_format") == {"type": "json_object"}
+    assert out[0].event_id == "e0" and out[0].bucket == "action"
+
+
 def test_local_rules_appended(monkeypatch, tmp_path):
     rules = tmp_path / "rules.md"
     rules.write_text("# base\n", encoding="utf-8")

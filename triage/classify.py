@@ -91,6 +91,7 @@ def classify(events: list, *, model: str | None = None) -> list[Classification]:
             {"role": "user", "content": user_prompt},
         ],
         model=model,
+        response_json=True,
     )
     data = _extract_json(raw)
     by_i = {int(r["i"]): r for r in data.get("results", []) if "i" in r}
