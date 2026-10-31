@@ -24,18 +24,25 @@ def chat(
     *,
     model: str | None = None,
     temperature: float = 0.0,
-    response_json: bool = False,
+    response_schema: dict | None = None,
     timeout: int = 60,
 ) -> str:
-    """Call chat/completions and return the first message's content."""
+    """Call chat/completions and return the first message's content.
+
+    response_schema constrains the reply to that JSON Schema (structured output), so
+    the endpoint cannot emit malformed JSON such as a broken \\uXXXX escape.
+    """
     base = os.environ.get("WHALEMAIL_LLM_BASE_URL", _DEFAULT_BASE).rstrip("/")
     key = os.environ.get("WHALEMAIL_LLM_API_KEY", "")
     if not key:
         raise RuntimeError("WHALEMAIL_LLM_API_KEY is not set")
     model = model or os.environ.get("WHALEMAIL_CLASSIFY_MODEL", _DEFAULT_MODEL)
     body: dict = {"model": model, "messages": messages, "temperature": temperature}
-    if response_json:
-        body["response_format"] = {"type": "json_object"}
+    if response_schema is not None:
+        body["response_format"] = {
+            "type": "json_schema",
+            "json_schema": {"name": "response", "schema": response_schema},
+        }
     req = urllib.request.Request(
         f"{base}/chat/completions",
         data=json.dumps(body, ensure_ascii=False).encode("utf-8"),

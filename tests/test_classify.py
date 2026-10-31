@@ -42,7 +42,7 @@ def test_extract_json_strips_fence():
     assert C._extract_json('prefix {"results": [{"i": 0}]} suffix') == {"results": [{"i": 0}]}
 
 
-def test_classification_request_constrains_response_to_json(monkeypatch):
+def test_classification_request_constrains_response_to_schema(monkeypatch):
     monkeypatch.setenv("WHALEMAIL_LLM_API_KEY", "test-key")
     requests = []
 
@@ -56,7 +56,10 @@ def test_classification_request_constrains_response_to_json(monkeypatch):
     monkeypatch.setattr(C.llm.net, "urlopen_json", fake_request)
     out = C.classify([_Ev("e0", "S", "s")])
     assert len(requests) == 1
-    assert requests[0].get("response_format") == {"type": "json_object"}
+    fmt = requests[0]["response_format"]
+    assert fmt["type"] == "json_schema"
+    item = fmt["json_schema"]["schema"]["properties"]["results"]["items"]
+    assert item["properties"]["bucket"]["enum"] == list(C.BUCKETS)
     assert out[0].event_id == "e0" and out[0].bucket == "action"
 
 

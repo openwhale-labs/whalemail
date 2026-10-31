@@ -30,6 +30,26 @@ Output JSON only, in this shape:
 {{"results": [{{"i": <index>, "bucket": "action|decision|fyi|verify|noise", "summary": "<one sentence>", "action": "<what to do, or empty string>"}}]}}
 Exactly one result per email; i is the input index. Output nothing outside the JSON."""
 
+_RESPONSE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "results": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "i": {"type": "integer"},
+                    "bucket": {"type": "string", "enum": list(BUCKETS)},
+                    "summary": {"type": "string"},
+                    "action": {"type": "string"},
+                },
+                "required": ["i", "bucket", "summary", "action"],
+            },
+        }
+    },
+    "required": ["results"],
+}
+
 
 @dataclass
 class Classification:
@@ -91,7 +111,7 @@ def classify(events: list, *, model: str | None = None) -> list[Classification]:
             {"role": "user", "content": user_prompt},
         ],
         model=model,
-        response_json=True,
+        response_schema=_RESPONSE_SCHEMA,
     )
     data = _extract_json(raw)
     by_i = {int(r["i"]): r for r in data.get("results", []) if "i" in r}
